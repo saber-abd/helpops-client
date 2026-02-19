@@ -20,8 +20,6 @@ public class HelpOpsClient {
 
     private Token  token;    // token de session obtenu apres connexion
 
-    // Constructeur : connexion aux deux serveurs RMI
-
     public HelpOpsClient(String authHost, String serverHost) {
         try {
             System.setProperty("file.encoding", "UTF-8");
