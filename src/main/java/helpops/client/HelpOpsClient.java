@@ -22,13 +22,16 @@ public class HelpOpsClient {
         try {
             System.setProperty("file.encoding", "UTF-8");
             System.setProperty("console.encoding", "UTF-8");
+
             Registry authRegistry = LocateRegistry.getRegistry(authHost, 2000); // connexion serveur Auth
             auth = (RMIAuthService) authRegistry.lookup("AuthService");
             System.out.println("[CLIENT] Serveur Auth : " + auth.ping());
+
             Registry serverRegistry = LocateRegistry.getRegistry(serverHost, 1099); // connexion serveur principal
             service = (RMIHelpOps) serverRegistry.lookup("HelpOps");
             System.out.println("[CLIENT] Serveur HelpOps : " + service.ping());
             System.out.println();
+
             scanner = new Scanner(System.in, StandardCharsets.UTF_8);
         } catch (Exception e) {
             System.err.println("[ERREUR] Impossible de se connecter aux serveurs.");
@@ -64,7 +67,7 @@ public class HelpOpsClient {
 
     private boolean seConnecter() {
         System.out.println("=== CONNEXION ===");
-        for (int tentative = 1; tentative <= 3; tentative++) {  //3 try pour plus de sécurité
+        for (int tentative = 1; tentative <= 3; tentative++) {  //3 essaie de connexion pour plus de sécurité
             try {
                 System.out.print("Login : ");
                 String login = scanner.nextLine().trim();
