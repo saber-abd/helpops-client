@@ -124,43 +124,7 @@ public class HelpOpsClient {
         }
     }
 
-    private void menuPrincipal() {
-        while (token != null) {
-            if (token.estAgent()) {
-                menuAgent();
-            } else {
-                menuUtilisateur();
-            }
-        }
-    }
 
-    private void menuAgent() {
-        System.out.println("=== MENU AGENT ===");
-        System.out.println("1. Prise en charge d'un incident");
-        System.out.println("2. Tous les incidents "); // Nouvelle option
-        System.out.println("3. Voir mes assignations");
-        System.out.println("4. Detail d'un incident");
-        System.out.println("5. Quitter");
-        System.out.print("Choix : ");
-        String choix = scanner.nextLine().trim();
-        System.out.println();
-
-        try {
-            switch (choix) {
-                case "1" -> voirEtPrendreEnCharge();
-                case "2" -> voirTousLesIncidents(); // Nouvelle méthode
-                case "3" -> voirMesAssignations();
-                case "4" -> voirDetail();
-                case "5" -> {
-                    token=null;
-                    return;
-                }
-                default  -> System.out.println("Choix invalide.");
-            }
-        } catch (Exception e) {
-            System.err.println("[ERREUR] " + e.getMessage());
-        }
-    }
 
     private void voirTousLesIncidents() throws Exception {
         System.out.println("--- Liste d'incidents ---");
@@ -206,32 +170,6 @@ public class HelpOpsClient {
             System.out.println("Vous n'avez aucun incident en cours.");
         } else {
             for (Incident i : liste) System.out.println(i);
-        }
-    }
-
-    private void menuUtilisateur() {
-        System.out.println("=== MENU UTILISATEUR ===");
-        System.out.println("1. Signaler un incident");
-        System.out.println("2. Mes incidents");
-        System.out.println("3. Detail d'un incident");
-        System.out.println("4. Quitter");
-        System.out.print("Choix : ");
-        String choix = scanner.nextLine().trim();
-        System.out.println();
-
-        try {
-            switch (choix) {
-                case "1" -> signalerIncident();
-                case "2" -> voirMesIncidents();
-                case "3" -> voirDetail();
-                case "4" -> {
-                        token=null;
-                        return;
-                }
-                default  -> System.out.println("Choix invalide.");
-            }
-        } catch (Exception e) {
-            System.err.println("[ERREUR] " + e.getMessage());
         }
     }
 
@@ -308,6 +246,70 @@ public class HelpOpsClient {
             // Solution de secours pour les IDE (IntelliJ), le texte sera visible
             System.out.print("Mot de passe : ");
             return scanner.nextLine().trim();
+        }
+    }
+
+    private void menuPrincipal() {
+        while (token != null) {
+            if (token.estAgent()) {
+                menuAgent();
+            } else {
+                menuUtilisateur();
+            }
+        }
+    }
+
+    private void menuAgent() {
+        System.out.println("=== MENU AGENT ===");
+        System.out.println("1. Prise en charge d'un incident");
+        System.out.println("2. Tous les incidents "); // Nouvelle option
+        System.out.println("3. Voir mes assignations");
+        System.out.println("4. Detail d'un incident");
+        System.out.println("5. Quitter");
+        System.out.print("Choix : ");
+        String choix = scanner.nextLine().trim();
+        System.out.println();
+
+        try {
+            switch (choix) {
+                case "1" -> voirEtPrendreEnCharge();
+                case "2" -> voirTousLesIncidents(); // Nouvelle méthode
+                case "3" -> voirMesAssignations();
+                case "4" -> voirDetail();
+                case "5" -> {
+                    token=null;
+                    return;
+                }
+                default  -> System.out.println("Choix invalide.");
+            }
+        } catch (Exception e) {
+            System.err.println("[ERREUR] " + e.getMessage());
+        }
+    }
+
+    private void menuUtilisateur() {
+        System.out.println("=== MENU UTILISATEUR ===");
+        System.out.println("1. Signaler un incident");
+        System.out.println("2. Mes incidents");
+        System.out.println("3. Detail d'un incident");
+        System.out.println("4. Quitter");
+        System.out.print("Choix : ");
+        String choix = scanner.nextLine().trim();
+        System.out.println();
+
+        try {
+            switch (choix) {
+                case "1" -> signalerIncident();
+                case "2" -> voirMesIncidents();
+                case "3" -> voirDetail();
+                case "4" -> {
+                    token=null;
+                    return;
+                }
+                default  -> System.out.println("Choix invalide.");
+            }
+        } catch (Exception e) {
+            System.err.println("[ERREUR] " + e.getMessage());
         }
     }
 
