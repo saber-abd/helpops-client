@@ -16,7 +16,7 @@ public class HelpOpsClient {
     private RMIAuthService auth;
     private RMIHelpOps service;
     private Scanner scanner;
-    private Token token;    // token de session obtenu apres connexion
+    private Token token;// token de session obtenu apres connexion
 
     public HelpOpsClient(String authHost, String serverHost) {
         try {
@@ -43,16 +43,13 @@ public class HelpOpsClient {
 
     public void demarrer() {
         System.out.println("=== HELP'OPS  ===");
-
         while (true) {
-            // Phase 1 : Connexion / Inscription
             while (token == null) {
                 System.out.println("\n1. Se connecter");
                 System.out.println("2. Creer un compte");
                 System.out.println("3. Quitter");
                 System.out.print("Choix : ");
                 String choix = scanner.nextLine().trim();
-
                 if ("1".equals(choix)) {
                     seConnecter();
                 } else if ("2".equals(choix)) {
@@ -62,28 +59,20 @@ public class HelpOpsClient {
                     return; // Sortie définitive du programme
                 } else {
                     System.out.println("Choix invalide.");
-                }
-            }
-
-            // Phase 2 :Lancemwent du menu
+                }}
             menuPrincipal();
-
-            //Phase 3: deconnection
             System.out.println("Retour au menu de connexion...");
-        }
-    }
+        }}
 
     private boolean seConnecter() {
         System.out.println("=== CONNEXION ===");
         int maxTentatives = 3;
-
         for (int i = 1; i <= maxTentatives; i++) {
             try {
                 System.out.print("Login : ");
                 String login = scanner.nextLine().trim();
                 String mdp = lireMotDePasse();
                 token = auth.connecter(login, hacher(mdp));
-
                 if (token != null) {
                     System.out.println("Bienvenue " + token.getLogin() + " !");
                     return true;
@@ -93,12 +82,10 @@ public class HelpOpsClient {
                         System.out.println("Identifiants incorrects. Il vous reste " + restants + " tentative(s).");
                     } else {
                         System.out.println("Compte bloqué temporairement ou trop d'échecs.");
-                    }
-                }
+                    }}
             } catch (Exception e) {
                 System.err.println("[ERREUR] " + e.getMessage());
-            }
-        }
+            }}
         return false; // Échec après 3 tentatives
     }
 
@@ -115,16 +102,13 @@ public class HelpOpsClient {
                 return token != null;
             } else {
                 System.out.println("Ce login est deja utilise. Choisissez-en un autre.");
-                return false;
-            }
+                return false;}
         } catch (Exception e) {
             System.err.println("[ERREUR] " + e.getMessage());
             return false;
 
         }
     }
-
-
 
     private void voirTousLesIncidents() throws Exception {
         System.out.println("--- Liste d'incidents ---");
@@ -141,23 +125,17 @@ public class HelpOpsClient {
     private void voirEtPrendreEnCharge() throws Exception {
         System.out.println("--- Incidents en attente ---");
         List<Incident> ouverts = service.listerIncidentsOuverts(token.getValeur());
-
         if (ouverts.isEmpty()) {
             System.out.println("Aucun incident ouvert.");
-            return;
-        }
-
+            return;}
         for (Incident i : ouverts) {
             System.out.println(i);
         }
-
         System.out.print("\nID de l'incident à prendre en charge (ou Entrée pour annuler) : ");
         String idStr = scanner.nextLine().trim();
         if (idStr.isEmpty()) return;
-
         int id = Integer.parseInt(idStr);
         boolean ok = service.prendreEnChargeIncident(token.getValeur(), id);
-
         if (ok) {
             System.out.println("[SUCCÈS] Vous avez pris en charge l'incident #" + id);
         }
@@ -186,7 +164,6 @@ public class HelpOpsClient {
             System.out.println("Erreur : Le titre et la catégorie sont obligatoires.");
             return;
         }
-
         Incident i = service.signalerIncident(token.getValeur(), cat, titre, desc);
         if (i != null) {
             System.out.println("[SUCCÈS] Incident créé avec l'ID #" + i.getId());
@@ -239,11 +216,9 @@ public class HelpOpsClient {
     private String lireMotDePasse() {
         Console console = System.console();
         if (console != null) {
-            // La méthode readPassword masque la saisie par défaut
             char[] passwordChars = console.readPassword("Mot de passe : ");
             return new String(passwordChars);
         } else {
-            // Solution de secours pour les IDE (IntelliJ), le texte sera visible
             System.out.print("Mot de passe : ");
             return scanner.nextLine().trim();
         }
@@ -262,30 +237,27 @@ public class HelpOpsClient {
     private void menuAgent() {
         System.out.println("=== MENU AGENT ===");
         System.out.println("1. Prise en charge d'un incident");
-        System.out.println("2. Tous les incidents "); // Nouvelle option
+        System.out.println("2. Tous les incidents ");
         System.out.println("3. Voir mes assignations");
         System.out.println("4. Detail d'un incident");
         System.out.println("5. Quitter");
         System.out.print("Choix : ");
         String choix = scanner.nextLine().trim();
         System.out.println();
-
         try {
             switch (choix) {
                 case "1" -> voirEtPrendreEnCharge();
-                case "2" -> voirTousLesIncidents(); // Nouvelle méthode
+                case "2" -> voirTousLesIncidents();
                 case "3" -> voirMesAssignations();
                 case "4" -> voirDetail();
                 case "5" -> {
                     token=null;
                     return;
                 }
-                default  -> System.out.println("Choix invalide.");
-            }
+                default  -> System.out.println("Choix invalide.");}
         } catch (Exception e) {
             System.err.println("[ERREUR] " + e.getMessage());
-        }
-    }
+        }}
 
     private void menuUtilisateur() {
         System.out.println("=== MENU UTILISATEUR ===");
@@ -314,8 +286,8 @@ public class HelpOpsClient {
     }
 
     public static void main(String[] args) {
-        String authHost   = (args.length > 0) ? args[0] : "localhost";  // args[0] = adresse du serveur Auth
-        String serverHost = (args.length > 1) ? args[1] : "localhost";  // args[1] = serveur HelpOps
+        String authHost   = (args.length > 0) ? args[0] : "localhost";  // adresse du serveur Auth
+        String serverHost = (args.length > 1) ? args[1] : "localhost";  // adresse serveur HelpOps
         new HelpOpsClient(authHost, serverHost).demarrer();
     }
 }
