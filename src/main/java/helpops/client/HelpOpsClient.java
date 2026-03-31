@@ -8,6 +8,7 @@ import helpops.model.Token;
 
 import java.io.Console;
 import java.nio.charset.StandardCharsets;
+import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.List;
@@ -18,6 +19,8 @@ public class HelpOpsClient {
     private RMIHelpOps service;
     private Scanner scanner;
     private Token token;// token de session obtenu apres connexion
+    private SupervisionHandler supervisionHandler;
+    private boolean supervisionActive = false;
 
     public HelpOpsClient(String authHost, String serverHost) {
         try {
@@ -165,7 +168,9 @@ public class HelpOpsClient {
         System.out.println("5. Creer un ticket pour un utilisateur");
         System.out.println("6. Statistiques");
         System.out.println("7. Detail d'un incident");
-        System.out.println("8. Se deconnecter");
+        System.out.println("8. Activer/Desactiver le flux Live");
+        System.out.println("9. Se deconnecter");
+
         System.out.print("Choix : ");
         String choix = scanner.nextLine().trim();
         System.out.println();
@@ -178,7 +183,8 @@ public class HelpOpsClient {
                 case "5" -> creerTicketPourUser();
                 case "6" -> voirStatistiques();
                 case "7" -> voirDetail();
-                case "8" -> { token = null; return; }
+                case "9" -> { token = null; return; }
+                case "8" -> Supervision();
                 default  -> System.out.println("Choix invalide.");
             }
         } catch (Exception e) {
@@ -255,8 +261,18 @@ public class HelpOpsClient {
         String idStr = scanner.nextLine().trim();
         if (idStr.isEmpty()) return;
         int id = Integer.parseInt(idStr);
-        boolean ok = service.prendreEnChargeIncident(token.getValeur(), id);
-        if (ok) System.out.println("[SUCCES] Vous avez pris en charge l'incident #" + id);
+        try {
+            boolean ok = service.prendreEnChargeIncident(token.getValeur(), id);
+            if (ok) System.out.println("[SUCCES] Vous avez pris en charge l'incident #" + id);
+        } catch (RemoteException e) {
+            String message = e.getMessage();
+            if (message.contains("nested exception is:")) {
+                message = message.substring(message.lastIndexOf(":") + 1).trim();
+            }
+            System.out.println("\n[INFO] " + message);
+        } catch (Exception e) {
+            System.out.println("[ERREUR TECHNIQUE] " + e.getMessage());
+        }
     }
 
     private void voirTousLesIncidents() throws Exception {
@@ -337,6 +353,41 @@ public class HelpOpsClient {
         Statistiques stats = service.getStatistiques(token.getValeur());
         System.out.println(stats);
     }
+
+    //V3 SUPERVISION
+    private void activerSupervision() {
+        try {
+            if (supervisionHandler == null) {
+                supervisionHandler = new SupervisionHandler();
+            }
+            service.sAbonner(token.getValeur(), supervisionHandler);
+            System.out.println("[OK] Flux de supervision active. Vous recevrez les alertes en direct.");
+        } catch (Exception e) {
+            System.err.println("[ERREUR] Impossible d'activer la supervision : " + e.getMessage());
+        }
+    }
+
+    private void Supervision() {
+        try {
+            if (!supervisionActive) {
+                System.out.println("=== MODE SUPERVISION ===");
+                activerSupervision();
+                supervisionActive = true;
+                System.out.println("\n(Appuyez sur ENTREE pour quitter ce mode et revenir au menu)");
+                scanner.nextLine();
+                service.seDesabonner(token.getValeur(), supervisionHandler);
+                supervisionActive = false;
+                System.out.println("[INFO] Retour au menu principal.");
+
+            } else {
+                service.seDesabonner(token.getValeur(), supervisionHandler);
+                supervisionActive = false;
+            }
+        } catch (Exception e) {
+            System.out.println("Erreur : " + e.getMessage());
+        }
+    }
+
 
     //  utilitaires
     private String hacher(String motDePasse) {
