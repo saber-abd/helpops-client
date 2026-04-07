@@ -3,24 +3,23 @@ package helpops.client;
 import helpops.interfaces.RMIAuthService;
 import helpops.interfaces.RMIHelpOps;
 import helpops.model.Incident;
-import helpops.model.Statistiques;
 import helpops.model.Token;
-
-import java.io.Console;
 import java.nio.charset.StandardCharsets;
-import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.List;
 import java.util.Scanner;
+import static helpops.client.AgentAction.*;
+import static helpops.utils.ConsoleUtils.hacher;
+import static helpops.utils.ConsoleUtils.lireMotDePasse;
 
 public class HelpOpsClient {
     private RMIAuthService auth;
     private RMIHelpOps service;
     private Scanner scanner;
     private Token token;// token de session obtenu apres connexion
-    private SupervisionHandler supervisionHandler;
     private boolean supervisionActive = false;
+    private SupervisionUDP threadUDP;
 
     public HelpOpsClient(String authHost, String serverHost) {
         try {
@@ -78,7 +77,7 @@ public class HelpOpsClient {
             try {
                 System.out.print("Login : ");
                 String login = scanner.nextLine().trim();
-                String mdp = lireMotDePasse();
+                String mdp = lireMotDePasse(scanner);
                 token = auth.connecter(login, hacher(mdp));
                 if (token != null) {
                     System.out.println("Bienvenue " + token.getLogin() + " !");
@@ -110,7 +109,7 @@ public class HelpOpsClient {
         try {
             System.out.print("Login : ");
             String login = scanner.nextLine().trim();
-            String mdp = lireMotDePasse();
+            String mdp = lireMotDePasse(scanner);
             boolean ok = auth.inscrireAvecRole(login, hacher(mdp), role);
             if (ok) {
                 System.out.println("Compte " + role + " cree ! Connexion automatique...\n");
@@ -168,23 +167,25 @@ public class HelpOpsClient {
         System.out.println("5. Creer un ticket pour un utilisateur");
         System.out.println("6. Statistiques");
         System.out.println("7. Detail d'un incident");
-        System.out.println("8. Activer/Desactiver le flux Live");
-        System.out.println("9. Se deconnecter");
+        System.out.println("8. Supervision ");
+        System.out.println("9. Deleguer un ticket");
+        System.out.println("10. Se deconnecter");
 
         System.out.print("Choix : ");
         String choix = scanner.nextLine().trim();
         System.out.println();
         try {
             switch (choix) {
-                case "1" -> voirEtPrendreEnCharge();
-                case "2" -> voirTousLesIncidents();
-                case "3" -> voirMesAssignations();
-                case "4" -> resoudreTicket();
-                case "5" -> creerTicketPourUser();
-                case "6" -> voirStatistiques();
+                case "1" -> voirEtPrendreEnCharge(service,token,scanner);
+                case "2" -> voirTousLesIncidents(service,token);
+                case "3" -> voirMesAssignations(service,token);
+                case "4" -> resoudreTicket(service,token,scanner);
+                case "5" -> creerTicketPourUser(service,token,scanner);
+                case "6" -> voirStatistiques(service,token);
                 case "7" -> voirDetail();
-                case "9" -> { token = null; return; }
-                case "8" -> Supervision();
+                case "10" -> {if (supervisionActive) supervision();token = null;}
+                case "9" -> deleguerTicket(service,token,scanner);
+                case "8" -> supervision();
                 default  -> System.out.println("Choix invalide.");
             }
         } catch (Exception e) {
@@ -248,168 +249,18 @@ public class HelpOpsClient {
         }
     }
 
-    //  actions AGENT
-    private void voirEtPrendreEnCharge() throws Exception {
-        System.out.println("--- Incidents en attente ---");
-        List<Incident> ouverts = service.listerIncidentsOuverts(token.getValeur());
-        if (ouverts == null || ouverts.isEmpty()) {
-            System.out.println("Aucun incident ouvert.");
-            return;
-        }
-        for (Incident i : ouverts) System.out.println(i);
-        System.out.print("\nID de l'incident a prendre en charge (ou Entree pour annuler) : ");
-        String idStr = scanner.nextLine().trim();
-        if (idStr.isEmpty()) return;
-        int id = Integer.parseInt(idStr);
-        try {
-            boolean ok = service.prendreEnChargeIncident(token.getValeur(), id);
-            if (ok) System.out.println("[SUCCES] Vous avez pris en charge l'incident #" + id);
-        } catch (RemoteException e) {
-            String message = e.getMessage();
-            if (message.contains("nested exception is:")) {
-                message = message.substring(message.lastIndexOf(":") + 1).trim();
-            }
-            System.out.println("\n[INFO] " + message);
-        } catch (Exception e) {
-            System.out.println("[ERREUR TECHNIQUE] " + e.getMessage());
-        }
-    }
+    //  actions AGENT=> focntion deporter dans AgentAction
 
-    private void voirTousLesIncidents() throws Exception {
-        System.out.println("--- Liste de tous les incidents ---");
-        List<Incident> tous = service.listerTousLesIncidents(token.getValeur());
-        if (tous == null || tous.isEmpty()) {
-            System.out.println("Aucun incident dans le systeme.");
+    private void supervision() {
+        if (!supervisionActive) {
+            threadUDP = new SupervisionUDP(token);
+            threadUDP.start();
+            supervisionActive = true;
+            System.out.println("[INFO] Supervision UDP activee.");
         } else {
-            for (Incident i : tous) System.out.println(i);
-        }
-    }
-
-    private void voirMesAssignations() throws Exception {
-        System.out.println("--- Mes assignations ---");
-        List<Incident> liste = service.listerMesAssignations(token.getValeur());
-        if (liste == null || liste.isEmpty()) {
-            System.out.println("Vous n'avez aucun incident assigne.");
-        } else {
-            for (Incident i : liste) System.out.println(i);
-        }
-    }
-
-    // v3 resolution ticket assigne a l'agent connecte
-    private void resoudreTicket() throws Exception {
-        System.out.println("--- Resoudre un ticket ---");
-        List<Incident> assignations = service.listerMesAssignations(token.getValeur());
-        List<Incident> aResoudre = assignations == null ? List.of() :
-                assignations.stream()
-                        .filter(i -> "ASSIGNED".equalsIgnoreCase(i.getStatut()))
-                        .toList();
-        if (aResoudre.isEmpty()) {
-            System.out.println("Aucun ticket ASSIGNED a resoudre.");
-            return;
-        }
-        for (Incident i : aResoudre) System.out.println(i);
-        System.out.print("\nID du ticket a resoudre (ou Entree pour annuler) : ");
-        String idStr = scanner.nextLine().trim();
-        if (idStr.isEmpty()) return;
-        int id;
-        try { id = Integer.parseInt(idStr); }
-        catch (NumberFormatException e) { System.out.println("ID invalide."); return; }
-        System.out.print("Message de resolution : ");
-        String message = scanner.nextLine().trim();
-        if (message.isEmpty()) {
-            System.out.println("Le message de resolution est obligatoire.");
-            return;
-        }
-        boolean ok = service.resoudreTicket(token.getValeur(), id, message);
-        if (ok) System.out.println("[SUCCES] Ticket #" + id + " marque comme RESOLVED.");
-    }
-
-    // v3 agent cree un ticket pour un utilisateur
-    private void creerTicketPourUser() throws Exception {
-        System.out.println("--- Creer un ticket pour un utilisateur ---");
-        System.out.print("Login de l'utilisateur cible : ");
-        String loginCible = scanner.nextLine().trim();
-        System.out.print("Categorie : ");
-        String cat = scanner.nextLine().trim();
-        System.out.print("Titre : ");
-        String titre = scanner.nextLine().trim();
-        System.out.print("Description : ");
-        String desc = scanner.nextLine().trim();
-        if (cat.isEmpty() || titre.isEmpty()) {
-            System.out.println("Erreur : Le titre et la categorie sont obligatoires.");
-            return;
-        }
-        Incident i = service.creerTicketPourUtilisateur(token.getValeur(), loginCible, cat, titre, desc);
-        if (i != null) {
-            System.out.println("[SUCCES] Ticket #" + i.getId() + " cree pour l'utilisateur '" + loginCible + "'.");
-        } else {
-            System.out.println("[ERREUR] Echec de la creation.");
-        }
-    }
-
-    // v3 affichage statistiques
-    private void voirStatistiques() throws Exception {
-        System.out.println("--- Statistiques ---");
-        Statistiques stats = service.getStatistiques(token.getValeur());
-        System.out.println(stats);
-    }
-
-    //V3 SUPERVISION
-    private void activerSupervision() {
-        try {
-            if (supervisionHandler == null) {
-                supervisionHandler = new SupervisionHandler();
-            }
-            service.sAbonner(token.getValeur(), supervisionHandler);
-            System.out.println("[OK] Flux de supervision active. Vous recevrez les alertes en direct.");
-        } catch (Exception e) {
-            System.err.println("[ERREUR] Impossible d'activer la supervision : " + e.getMessage());
-        }
-    }
-
-    private void Supervision() {
-        try {
-            if (!supervisionActive) {
-                System.out.println("=== MODE SUPERVISION ===");
-                activerSupervision();
-                supervisionActive = true;
-                System.out.println("\n(Appuyez sur ENTREE pour quitter ce mode et revenir au menu)");
-                scanner.nextLine();
-                service.seDesabonner(token.getValeur(), supervisionHandler);
-                supervisionActive = false;
-                System.out.println("[INFO] Retour au menu principal.");
-
-            } else {
-                service.seDesabonner(token.getValeur(), supervisionHandler);
-                supervisionActive = false;
-            }
-        } catch (Exception e) {
-            System.out.println("Erreur : " + e.getMessage());
-        }
-    }
-
-
-    //  utilitaires
-    private String hacher(String motDePasse) {
-        try {
-            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
-            byte[] bytes = md.digest(motDePasse.getBytes(StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder();
-            for (byte b : bytes) sb.append(String.format("%02x", b));
-            return sb.toString();
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur de hachage", e);
-        }
-    }
-
-    private String lireMotDePasse() {
-        Console console = System.console();
-        if (console != null) {
-            char[] passwordChars = console.readPassword("Mot de passe : ");
-            return new String(passwordChars);
-        } else {
-            System.out.print("Mot de passe : ");
-            return scanner.nextLine().trim();
+            if (threadUDP != null) threadUDP.arreter();
+            supervisionActive = false;
+            System.out.println("[INFO] Supervision désactivee.");
         }
     }
 
